@@ -1,0 +1,5 @@
+embeddings.pt
+*.pt
+*.json
+__pycache__/
+dist/
