@@ -6,22 +6,33 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from startup_download import download_embeddings
+
+# ====== DOWNLOAD EMBEDDINGS IF NOT PRESENT ======
+download_embeddings()
 
 # ====== CONFIG ======
-EMBEDDINGS_FILE = "embeddings.pt"
-METADATA_FILE = "metadata.json"
+EMBEDDINGS_DIR = Path("/mnt/embeddings")
+EMBEDDINGS_FILE = EMBEDDINGS_DIR / "embeddings.pt"
+METADATA_FILE = EMBEDDINGS_DIR / "metadata.json"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 TOP_K = 5
 
 # ====== LOAD PRECOMPUTED EMBEDDINGS ======
 print("[INFO] Loading precomputed embeddings...")
+if not EMBEDDINGS_FILE.exists():
+    raise FileNotFoundError(f"Embeddings file not found at {EMBEDDINGS_FILE}")
+
 corpus_embeddings = torch.load(EMBEDDINGS_FILE, map_location="cpu")
 
 print("[INFO] Loading metadata...")
+if not METADATA_FILE.exists():
+    raise FileNotFoundError(f"Metadata file not found at {METADATA_FILE}")
+
 with open(METADATA_FILE, "r", encoding="utf-8") as f:
     meta = json.load(f)
 
-device = "cpu"  # HuggingFace Spaces only provide CPU for free
+device = "cpu"  # CPU because Render free tier has no GPU
 corpus_embeddings = corpus_embeddings.to(device)
 
 # Load model for encoding queries
@@ -49,16 +60,18 @@ async def read_root():
 @app.post("/query")
 async def query(request: Request):
     body = await request.json()
-    query_text = body.get("query", "")
+    query_text = body.get("query", "").strip()
 
-    if not query_text.strip():
+    if not query_text:
         return JSONResponse({"answer": "Please provide a valid question."})
 
     # Encode query
     query_embedding = embedder.encode([query_text], convert_to_tensor=True).to(device)
-    
+
     # Compute similarities
-    similarities = cosine_similarity(query_embedding.cpu().numpy(), corpus_embeddings.cpu().numpy())[0]
+    similarities = cosine_similarity(
+        query_embedding.cpu().numpy(), corpus_embeddings.cpu().numpy()
+    )[0]
     top_indices = similarities.argsort()[-TOP_K:][::-1]
 
     response_chunks = []
