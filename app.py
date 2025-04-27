@@ -12,7 +12,7 @@ from startup_download import download_embeddings
 download_embeddings()
 
 # ====== CONFIG ======
-EMBEDDINGS_DIR = Path("/mnt/embeddings")
+EMBEDDINGS_DIR = Path("embeddings")
 EMBEDDINGS_FILE = EMBEDDINGS_DIR / "embeddings.pt"
 METADATA_FILE = EMBEDDINGS_DIR / "metadata.json"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
